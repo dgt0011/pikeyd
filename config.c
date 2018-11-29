@@ -387,7 +387,7 @@ static void setup_xio(int xio)
 {
   char cfg_dat[]={
     0xff, //IODIR
-    0x00, //IPOL
+    0xff, //IPOL
     xio_dev[xio].inmask,  //GPINTEN - enable interrupts for defined pins
     0x00, //DEFVAL
     0x00, //INTCON - monitor changes
