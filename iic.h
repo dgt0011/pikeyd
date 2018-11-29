@@ -34,7 +34,6 @@ typedef enum{
 }iodev_e;
 
 int init_iic(void);
-//iodev_e dev_type(int devAddr);
 int connect_iic(int devAddr);
 void poll_iic(int xio);
 int write_iic(int devAddr, int regno, char *buf, int n);

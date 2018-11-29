@@ -31,28 +31,30 @@
 #include "iic.h"
 #include "joy_RPi.h"
 
-static int fd=0;
+static int fd = 0;
 static char buffer[12];
-static const char devName[]="/dev/i2c-1";
+static const char devName[] = "/dev/i2c-1";
 
 int init_iic(void)
 {
-  if( (fd = open(devName, O_RDWR)) < 0 ){
+  if ((fd = open(devName, O_RDWR)) < 0)
+  {
     perror(devName);
     return -1;
   }
-	
+
   return 0;
 }
 
 int connect_iic(int devAddr)
 {
   char errstr[80];
-  if ( ioctl(fd, I2C_SLAVE, devAddr) < 0 ){
+  if (ioctl(fd, I2C_SLAVE, devAddr) < 0)
+  {
     sprintf(errstr, "I2C address %02x connect", devAddr);
     perror(errstr);
     return -1;
-  }  
+  }
   return 0;
 }
 
@@ -65,46 +67,49 @@ void poll_iic(int xio)
   connect_iic(chip_addr);
   write(fd, buffer, 1);
   read(fd, buffer, 1);
-  //printf("iic poll %d: %02x = %02x\n", xio, chip_addr, buffer[0]);
   handle_iic_event(xio, buffer[0]);
-  //test_iic(chip_addr);
 }
 
 int write_iic(int devAddr, int regno, char *buf, int n)
 {
   int r;
   connect_iic(devAddr);
-  buffer[0]=regno;
+  buffer[0] = regno;
   memcpy(&buffer[1], buf, n);
 
-  if( (r = write(fd, buffer, n+1)) < 0 ){
+  if ((r = write(fd, buffer, n + 1)) < 0)
+  {
     perror("iic write data");
   }
   return r;
 }
 
-
 void test_iic(int devAddr, int regaddr)
 {
-  int i,n;
+  int i, n;
 
   buffer[0] = regaddr;
 
   connect_iic(devAddr);
 
-  if( (n = write(fd, buffer, 1)) < 0 ){
+  if ((n = write(fd, buffer, 1)) < 0)
+  {
     perror("Error writing to i2c");
   }
-  else{
+  else
+  {
     printf("Wrote %d bytes to device %02x on %s\n", n, devAddr, devName);
   }
 
-  if( (n = read(fd, buffer, 11)) < 0 ){
+  if ((n = read(fd, buffer, 11)) < 0)
+  {
     perror("Error reading from i2c");
   }
-  else{
-    printf("Read %d bytes from %02x/%02x\n",n, devAddr, regaddr);
-    for(i=0;i<n;i++){
+  else
+  {
+    printf("Read %d bytes from %02x/%02x\n", n, devAddr, regaddr);
+    for (i = 0; i < n; i++)
+    {
       printf("  %02x", (unsigned char)buffer[i]);
     }
     printf("\n");
@@ -113,46 +118,8 @@ void test_iic(int devAddr, int regaddr)
 
 void close_iic(void)
 {
-  if(fd){
+  if (fd)
+  {
     close(fd);
   }
 }
-
-/* don't use */
-#if 0
-iodev_e dev_type(int devAddr)
-{
-  iodev_e r = IO_UNK;
-  const char sig[][4]={ /* i2c device signatures */
-    {0xff, 0, 0, 0}, /* MCP23008 */
-    {0xff, 0xff, 0, 0} /* MCP23017 */
-  };
-  int n;
-
-  connect_iic(devAddr);
-  buffer[0] = 0;
-
-  if( (n = write(fd, buffer, 1)) < 0 ){
-    perror("Error writing to i2c");
-  }
-
-  if( (n = read(fd, buffer, 4)) < 0 ){
-    perror("Error reading from i2c");
-  }
-  else{
-    if( memcmp(buffer, sig[0]) == 0 ){
-      printf("Device is MCP23008\n");
-      r = IO_MCP23008;
-    }
-    else if( memcmp(buffer, sig[1]) == 0 ){
-      printf("Device is MCP23017\n");
-      r = IO_MCP23017;
-    }
-    else{
-      printf("Device not identified\n");
-    }
-  }
-  return r;
-}
-#endif
-

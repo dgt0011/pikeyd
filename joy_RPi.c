@@ -40,35 +40,29 @@
 
 #if defined RPI_JOYSTICK
 
-#define GPIO_PERI_BASE        0x20000000
-#define GPIO_BASE             (GPIO_PERI_BASE + 0x3f0000)
-#define BLOCK_SIZE            (4 * 1024)
-#define PAGE_SIZE             (4 * 1024)
-#define GPIO_ADDR_OFFSET      13
-#define BUFF_SIZE             128
-#define JOY_BUTTONS           32
-#define JOY_AXES              2
-#define JOY_DIRS              2
+#define GPIO_PERI_BASE 0x20000000
+#define GPIO_BASE (GPIO_PERI_BASE + 0x3f0000)
+#define BLOCK_SIZE (4 * 1024)
+#define PAGE_SIZE (4 * 1024)
+#define GPIO_ADDR_OFFSET 13
+#define BUFF_SIZE 128
+#define JOY_BUTTONS 32
+#define JOY_AXES 2
+#define JOY_DIRS 2
 
 #define BOUNCE_TIME 2
 
-// Raspberry Pi V1 GPIO
-//static int GPIO_Pin[] = { 0, 1, 4, 7, 8, 9, 10, 11, 14, 15, 17, 18, 21, 22, 23, 24, 25 };
-// Raspberry Pi V2 GPIO
-//static int GPIO_Pin[] = { 2, 3, 4, 7, 8, 9, 10, 11, 14, 15, 17, 18, 22, 23, 24, 25, 27 };
-//MameBox pins
-//static int GPIO_Pin[] = { 4, 17, 18, 22, 23, 24, 10, 25, 11, 8, 7 };
 static char GPIO_Filename[JOY_BUTTONS][BUFF_SIZE];
 
 static int GpioFile;
-static char* GpioMemory;
-static char* GpioMemoryMap;
-volatile unsigned* GPIO;
+static char *GpioMemory;
+static char *GpioMemoryMap;
+volatile unsigned *GPIO;
 static int AllMask;
-static int lastGpio=0;
-static int xGpio=0;
-static int bounceCount=0;
-static int doRepeat=0;
+static int lastGpio = 0;
+static int xGpio = 0;
+static int bounceCount = 0;
+static int doRepeat = 0;
 
 struct joydata_struct
 {
@@ -85,74 +79,81 @@ struct joydata_struct
 
 int joy_RPi_init(void)
 {
-  FILE* File;
+  FILE *File;
   int Index;
   char Buffer[BUFF_SIZE];
   int n = gpios_used();
   int xios = 0;
 
-  for (Index = 0; Index < n; ++Index){
+  for (Index = 0; Index < n; ++Index)
+  {
     sprintf(Buffer, "/sys/class/gpio/export");
-    if (!(File = fopen(Buffer, "w"))){
+    if (!(File = fopen(Buffer, "w")))
+    {
       perror(Buffer);
-      //printf("Failed to open file: %s\n", Buffer);
       return -1;
     }
-    else{
+    else
+    {
       fprintf(File, "%u", gpio_pin(Index));
       fclose(File);
 
       sprintf(Buffer, "/sys/class/gpio/gpio%u/direction", gpio_pin(Index));
-      if (!(File = fopen(Buffer, "w"))){
-	perror(Buffer);
-	//printf("Failed to open file: %s\n", Buffer);
+      if (!(File = fopen(Buffer, "w")))
+      {
+        perror(Buffer);
       }
-      else{
-	fprintf(File, "in");
-	fclose(File);
-	sprintf(GPIO_Filename[Index], "/sys/class/gpio/gpio%u/value", gpio_pin(Index));
+      else
+      {
+        fprintf(File, "in");
+        fclose(File);
+        sprintf(GPIO_Filename[Index], "/sys/class/gpio/gpio%u/value", gpio_pin(Index));
       }
       AllMask |= (1 << gpio_pin(Index));
-      xios |= ( is_xio(gpio_pin(Index)) << gpio_pin(Index) );
+      xios |= (is_xio(gpio_pin(Index)) << gpio_pin(Index));
       joy_data[0].is_xio[Index] = is_xio(gpio_pin(Index));
     }
   }
 
   GPIO = NULL;
   GpioMemory = NULL;
-  if((GpioFile = open("/dev/mem", O_RDWR | O_SYNC)) < 0){
+  if ((GpioFile = open("/dev/mem", O_RDWR | O_SYNC)) < 0)
+  {
     perror("/dev/mem");
     printf("Failed to open memory\n");
     return -1;
   }
-  else if(!(GpioMemory = malloc(BLOCK_SIZE + PAGE_SIZE - 1))){
+  else if (!(GpioMemory = malloc(BLOCK_SIZE + PAGE_SIZE - 1)))
+  {
     perror("malloc");
     printf("Failed to allocate memory map\n");
     return -1;
   }
-  else{
-    if ((unsigned long)GpioMemory % PAGE_SIZE){
+  else
+  {
+    if ((unsigned long)GpioMemory % PAGE_SIZE)
+    {
       GpioMemory += PAGE_SIZE - ((unsigned long)GpioMemory % PAGE_SIZE);
     }
 
-    if ((long)(GpioMemoryMap = 
-	       (unsigned char*)mmap(
-				    (caddr_t)GpioMemory, 
-				    BLOCK_SIZE, 
-				    PROT_READ | PROT_WRITE,
-				    MAP_SHARED | MAP_FIXED, 
-				    GpioFile, 
-				    GPIO_BASE
-				    )
-	       ) < 0){
+    if ((long)(GpioMemoryMap =
+                   (unsigned char *)mmap(
+                       (caddr_t)GpioMemory,
+                       BLOCK_SIZE,
+                       PROT_READ | PROT_WRITE,
+                       MAP_SHARED | MAP_FIXED,
+                       GpioFile,
+                       GPIO_BASE)) < 0)
+    {
       perror("mmap");
       printf("Failed to map memory\n");
       return -1;
     }
-    else{
+    else
+    {
       close(GpioFile);
-      GPIO = (volatile unsigned*)GpioMemoryMap;
-      lastGpio = ((int*)GPIO)[GPIO_ADDR_OFFSET];
+      GPIO = (volatile unsigned *)GpioMemoryMap;
+      lastGpio = ((int *)GPIO)[GPIO_ADDR_OFFSET];
     }
   }
 
@@ -160,27 +161,25 @@ int joy_RPi_init(void)
   joy_data[0].fd = 1;
   joy_data[0].num_buttons = n;
   joy_data[0].num_axes = 0;
-  joy_data[0].button_mask=0;
-  joy_data[0].xio_mask=xios;
+  joy_data[0].button_mask = 0;
+  joy_data[0].xio_mask = xios;
 
-  bounceCount=0;
+  bounceCount = 0;
 
   printf("Joystick init OK.\n");
 
   return 0;
 }
 
-
 void joy_RPi_exit(void)
 {
-   if (GpioFile >= 0)
-      close(GpioFile);
+  if (GpioFile >= 0)
+    close(GpioFile);
 }
-
 
 void joy_RPi_poll(void)
 {
-  FILE* File;
+  FILE *File;
   int Joystick;
   int Index;
   int Char;
@@ -189,56 +188,61 @@ void joy_RPi_poll(void)
 
   Joystick = 0;
 
-  if(joy_data[Joystick].fd){			
-    if (!GPIO){ /* fallback I/O? don't use - very slow. */
-      for (Index = 0; Index < joy_data[Joystick].num_buttons; ++Index){
-	if( (File = fopen(GPIO_Filename[Index], "r")) ){
-	  Char = fgetc(File);
-	  fclose(File);
+  if (joy_data[Joystick].fd)
+  {
+    if (!GPIO)
+    { /* fallback I/O? don't use - very slow. */
+      for (Index = 0; Index < joy_data[Joystick].num_buttons; ++Index)
+      {
+        if ((File = fopen(GPIO_Filename[Index], "r")))
+        {
+          Char = fgetc(File);
+          fclose(File);
 
-	  iomask = (1 << gpio_pin(Index));
-	  if (Char == '0'){
-	    newGpio |= iomask;
-	    //joy_data[Joystick].buttons[Index] = 1;
-	  }
-	  else{
-	    newGpio &= ~iomask;
-	    //joy_data[Joystick].buttons[Index] = 0;
-	  }
-	}
+          iomask = (1 << gpio_pin(Index));
+          if (Char == '0')
+          {
+            newGpio |= iomask;
+          }
+          else
+          {
+            newGpio &= ~iomask;
+          }
+        }
       }
     }
-    else{
-      newGpio = ((int*)GPIO)[GPIO_ADDR_OFFSET];
+    else
+    {
+      newGpio = ((int *)GPIO)[GPIO_ADDR_OFFSET];
     }
     newGpio &= AllMask;
 
-    //printf("%d: %08x\n", bounceCount, newGpio);
-    
-    if(newGpio != lastGpio){
-      bounceCount=0;
+    if (newGpio != lastGpio)
+    {
+      bounceCount = 0;
       xGpio |= newGpio ^ lastGpio;
-      //printf("%08x\n", xGpio);
     }
     lastGpio = newGpio;
     xGpio &= ~joy_data[Joystick].xio_mask; /* remove expanders from change monitor */
 
-    if(bounceCount>=BOUNCE_TIME){
+    if (bounceCount >= BOUNCE_TIME)
+    {
       joy_data[Joystick].button_mask = newGpio;
       joy_data[Joystick].change_mask = xGpio;
 
-      for (Index = 0; Index < joy_data[Joystick].num_buttons; ++Index){
-	iomask = (1 << gpio_pin(Index));
-	joy_data[Joystick].buttons[Index] = !(newGpio & iomask);
-	joy_data[Joystick].change[Index] = !!(xGpio & iomask);
+      for (Index = 0; Index < joy_data[Joystick].num_buttons; ++Index)
+      {
+        iomask = (1 << gpio_pin(Index));
+        joy_data[Joystick].buttons[Index] = !(newGpio & iomask);
+        joy_data[Joystick].change[Index] = !!(xGpio & iomask);
       }
       xGpio = 0;
     }
 
-    if(bounceCount<BOUNCE_TIME)bounceCount++;
+    if (bounceCount < BOUNCE_TIME)
+      bounceCount++;
 
     joy_handle_event();
-
   }
 }
 
@@ -249,15 +253,15 @@ void joy_enable_repeat(void)
 
 static void joy_handle_repeat(void)
 {
-  const struct {
+  const struct
+  {
     int time[4];
     int value[4];
     int next[4];
-  }mxkey = {
-    {80, 200, 40, 40},
-    {0, 1, 0, 1},
-    {1, 2, 3, 2}
-  };
+  } mxkey = {
+      {80, 200, 40, 40},
+      {0, 1, 0, 1},
+      {1, 2, 3, 2}};
   /* key repeat metrics: release after 80ms, press after 200ms, release after 40ms, press after 40ms */
 
   static int idx = -1;
@@ -268,22 +272,26 @@ static void joy_handle_repeat(void)
 
   get_last_key(&ks);
 
-  if(doRepeat){
-    if(!ks.val || (ks.key != prev_key)){ /* restart on release or key change */
+  if (doRepeat)
+  {
+    if (!ks.val || (ks.key != prev_key))
+    { /* restart on release or key change */
       prev_key = ks.key;
-      idx=-1;
+      idx = -1;
       t_next = t_now;
     }
-    else if(idx<0){ /* start new cycle */
+    else if (idx < 0)
+    { /* start new cycle */
       idx = 0;
       t_next = t_now + mxkey.time[idx];
     }
-    else if(t_now == t_next){
+    else if (t_now == t_next)
+    {
       sendKey(ks.key, mxkey.value[idx]);
       idx = mxkey.next[idx];
       t_next = t_now + mxkey.time[idx];
     }
-    t_now+=4; /* runs every 4 ms */
+    t_now += 4; /* runs every 4 ms */
   }
 }
 
@@ -293,29 +301,30 @@ void joy_handle_event(void)
   int Index;
 
   /* handle all active irqs */
-  if(~joy_data[Joystick].button_mask & joy_data[Joystick].xio_mask){ /* if active ints exist */
-    //printf("XIO = %08x\n", ~joy_data[Joystick].button_mask & joy_data[Joystick].xio_mask);
-    for (Index = 0; Index < joy_data[Joystick].num_buttons; ++Index){
-      if( joy_data[Joystick].is_xio[Index] & joy_data[Joystick].buttons[Index]){
-	send_gpio_keys(gpio_pin(Index), joy_data[Joystick].buttons[Index]);
-      } 
+  if (~joy_data[Joystick].button_mask & joy_data[Joystick].xio_mask)
+  { /* if active ints exist */
+    for (Index = 0; Index < joy_data[Joystick].num_buttons; ++Index)
+    {
+      if (joy_data[Joystick].is_xio[Index] & joy_data[Joystick].buttons[Index])
+      {
+        send_gpio_keys(gpio_pin(Index), joy_data[Joystick].buttons[Index]);
+      }
     }
   }
   /* handle normal gpios */
-  if(joy_data[Joystick].change_mask){
-    //printf("GPIOs = %08x\n", joy_data[Joystick].button_mask);
+  if (joy_data[Joystick].change_mask)
+  {
     joy_data[Joystick].change_mask = 0;
-    for (Index = 0; Index < joy_data[Joystick].num_buttons; ++Index){
-      if( joy_data[Joystick].change[Index] ){
-	joy_data[Joystick].change[Index] = 0;
-	//printf("Button %d = %d\n", Index, joy_data[Joystick].buttons[Index]);
-	send_gpio_keys(gpio_pin(Index), joy_data[Joystick].buttons[Index]);
-      } 
+    for (Index = 0; Index < joy_data[Joystick].num_buttons; ++Index)
+    {
+      if (joy_data[Joystick].change[Index])
+      {
+        joy_data[Joystick].change[Index] = 0;
+        send_gpio_keys(gpio_pin(Index), joy_data[Joystick].buttons[Index]);
+      }
     }
   }
   joy_handle_repeat();
 }
 
-
 #endif
-

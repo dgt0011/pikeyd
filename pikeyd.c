@@ -36,53 +36,57 @@ int main(int argc, char *argv[])
   int en_daemonize = 0;
   int i;
 
-  for(i=1; i<argc; i++){
-    if(!strcmp(argv[i], "-d")){
+  for (i = 1; i < argc; i++)
+  {
+    if (!strcmp(argv[i], "-d"))
+    {
       en_daemonize = 1;
       //daemonize("/tmp", "/tmp/pikeyd.pid");
     }
-    if(!strcmp(argv[i], "-k")){
+    if (!strcmp(argv[i], "-k"))
+    {
       daemonKill("/tmp/pikeyd.pid");
       exit(0);
     }
-    if(!strcmp(argv[i], "-r")){
+    if (!strcmp(argv[i], "-r"))
+    {
       joy_enable_repeat();
     }
-    if(!strcmp(argv[i], "-v")){
+    if (!strcmp(argv[i], "-v"))
+    {
       showVersion();
       exit(0);
     }
-    if(!strcmp(argv[i], "-h")){
+    if (!strcmp(argv[i], "-h"))
+    {
       showHelp();
       exit(0);
     }
   }
 
-  if(en_daemonize){
+  if (en_daemonize)
+  {
     daemonize("/tmp", "/tmp/pikeyd.pid");
   }
 
   init_iic();
   init_config();
 
-  //test_config(); exit(0);
-
-  //test_iic(0x20);  close_iic();  exit(0);
-
-  //printf("init uinput\n");
-
-  if(init_uinput() == 0){
+  if (init_uinput() == 0)
+  {
     sleep(1);
-    //test_uinput();
-    if(joy_RPi_init()>=0){
+    if (joy_RPi_init() >= 0)
+    {
 
-      if(!en_daemonize){
-	printf("Press ^C to exit.\n");
+      if (!en_daemonize)
+      {
+        printf("Press ^C to exit.\n");
       }
 
-      for(;;){
-	joy_RPi_poll();
-	usleep(4000);
+      for (;;)
+      {
+        joy_RPi_poll();
+        usleep(4000);
       }
 
       joy_RPi_exit();
